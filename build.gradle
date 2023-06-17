@@ -1,0 +1,28 @@
+plugins {
+    id 'org.jetbrains.kotlin.jvm' version '1.8.21'
+    id 'jacoco'
+}
+
+group = 'ru.netology'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'junit:junit:4.13.1'
+    testImplementation 'junit:junit:4.13.1'
+    testImplementation 'junit:junit:4.13.1'
+    testImplementation 'junit:junit:4.13.1'
+    testImplementation 'junit:junit:4.13.1'
+
+}
+
+
+
+kotlin {
+    jvmToolchain(8)
+}

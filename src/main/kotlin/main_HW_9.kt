@@ -177,12 +177,23 @@ class ChatService {
             if ((ind + numberToShow) > (chats[chat].inMsg + chats[chat].outMsg).size) (chats[chat].inMsg + chats[chat].outMsg).size else (ind + numberToShow)
         for (index in ind until lastIndex) {
             if (chats[chat].inMsg.contains(msg[index])) {
-                (chats[chat].inMsg + chats[chat].outMsg).sortedBy { it.msgId }[index].readMark = true
+                //(chats[chat].inMsg + chats[chat].outMsg).sortedBy { it.msgId }[index].readMark = true
+                msg[index].readMark = true
             }
         }
         val msgToShow =
-            (chats[chat].inMsg + chats[chat].outMsg).sortedBy { it.msgId }.subList(fromIndex = ind, toIndex = lastIndex)
+            //(chats[chat].inMsg + chats[chat].outMsg).sortedBy { it.msgId }.subList(fromIndex = ind, toIndex = lastIndex)
+            msg.subList(fromIndex = ind, toIndex = lastIndex)
         return msgToShow.joinToString("\n")
+    }
+
+    fun getLastMsg(ownerId: Int): MutableList<String> {
+        val chats = chats.filter { it.ownerId == ownerId }
+        val msg = mutableListOf<String>()
+        chats.forEach {
+            msg += if ((it.inMsg + it.outMsg).isEmpty()) "Нет сообщений" else (it.inMsg + it.outMsg).last().toString()
+        }
+        return msg
     }
 }
 
@@ -195,6 +206,8 @@ fun main() {
     println(chat1.createMsg(4, 1, "msg4.1"))  // msdId = 4
     println(chat1.createMsg(4, 6, "msg5.2"))  // msdId = 5
     println(chat1.createMsg(4, 1, "msg4.2"))
+    println(chat1.createMsg(6, 7, "msg6.1"))
+    println(chat1.deleteMsd(6, 7, 7))
     println(chat1.getAllChats(1))
     println(chat1.getAllChats(4))
     println(chat1.getAllChats(6))
@@ -202,6 +215,8 @@ fun main() {
 
     println("Specified in-msg")
     println(chat1.getSpecifiedInMsg(4, 1, 1, 3))
+    println("All msg")
+    println(chat1.getMsgOfChatFunc(4, 1))
 
     println()
     println("reading msg")
@@ -241,6 +256,8 @@ fun main() {
     println(chat1.getAllChats(1))
     println(chat1.getAllChats(4))
     println()
+    println("Get last msg")
+    println(chat1.getLastMsg(6))
 
 
 }

@@ -8,7 +8,7 @@ class ChatServiceTestHW9 {
     fun createMsgShouldCreate() {
         val chat = ChatService()
         chat.createMsg(1, 4, "msg1.1")
-        val msg = chat.getMsgOfChat(1, 4)
+        val msg = chat.getMsgOfChatFunc(1, 4)
         val result = msg.isNotEmpty()
         assertTrue(result)
     }
@@ -35,7 +35,7 @@ class ChatServiceTestHW9 {
         val chat = ChatService()
         chat.createMsg(1, 4, "msg1.1")
         chat.deleteMsd(1, 4, 1)
-        val msg = chat.getMsgOfChat(1, 4)
+        val msg = chat.getMsgOfChatFunc(1, 4)
         val result = msg.isEmpty()
         assertTrue(result)
     }

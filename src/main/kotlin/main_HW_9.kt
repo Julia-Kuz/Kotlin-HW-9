@@ -1,4 +1,4 @@
-class ChatService {
+class ChatServiceOptimised {
     data class Chat(
         val ownerId: Int = 0,
         val chatId: Int = 0,
@@ -16,6 +16,8 @@ class ChatService {
     )
 
     private var chats = mutableListOf<Chat>()
+    private var chatsSeq = chats.asSequence()
+
     private var msgId: Int = 1
     private var chatId: Int = 0
 
@@ -23,183 +25,167 @@ class ChatService {
     class ChatNotFoundException(message: String) : RuntimeException(message)
     class MessageNotFoundException(message: String) : RuntimeException(message)
 
-//    fun createMsg(ownerId: Int, toWhoId: Int, text: String): Int {
-//        val message = Message(ownerId = ownerId, msgId = msgId++, toWhoId = toWhoId, text = text)
-//        chatId++
-//
-//        // проверка наличия чата у отправителя: создаю или просто добавляю смс
-//        val chat1 = chats.find { it.ownerId == ownerId && it.toWhoId == toWhoId }
-//        if (chat1 == null) {
-//            chats += Chat(ownerId = ownerId, chatId = chatId, toWhoId = toWhoId, outMsg = mutableListOf(message))
-//        } else chat1.outMsg += message
-//
-//        // проверка наличия чата у получателя: создаю или просто добавляю смс
-//        val chat2 = chats.find { it.ownerId == toWhoId && it.toWhoId == ownerId }
-//        if (chat2 == null) {
-//            chats += Chat(ownerId = toWhoId, chatId = chatId, toWhoId = ownerId, inMsg = mutableListOf(message))
-//        } else chat2.inMsg += message
-//
-//        return 1
-//    }
-
-    // вынесла проверку и создание чата в отд ф-цию
+    // п.7
     private fun checkCreateChat(ownerId: Int, toWhoId: Int, message: Message) {
         chatId++
         // проверка наличия чата у отправителя: создаю или просто добавляю смс
-        val chat1 = chats.find { it.ownerId == ownerId && it.toWhoId == toWhoId }
-        if (chat1 == null) {
-            chats += Chat(ownerId = ownerId, chatId = chatId, toWhoId = toWhoId, outMsg = mutableListOf(message))
-        } else chat1.outMsg += message
+        chatsSeq.find { it.ownerId == ownerId && it.toWhoId == toWhoId }
+            .let {
+                it?.outMsg?.plusAssign(message) ?: it.let {
+                    chatsSeq += Chat(
+                        ownerId = ownerId,
+                        chatId = chatId,
+                        toWhoId = toWhoId,
+                        outMsg = mutableListOf(message)
+                    )
+                }
+            }
 
         // проверка наличия чата у получателя: создаю или просто добавляю смс
-        val chat2 = chats.find { it.ownerId == toWhoId && it.toWhoId == ownerId }
-        if (chat2 == null) {
-            chats += Chat(ownerId = toWhoId, chatId = chatId, toWhoId = ownerId, inMsg = mutableListOf(message))
-        } else chat2.inMsg += message
+        chatsSeq.find { it.ownerId == toWhoId && it.toWhoId == ownerId }
+
+            .let {
+                it?.inMsg?.plusAssign(message) ?: it.let {
+                    chatsSeq += Chat(
+                        ownerId = toWhoId,
+                        chatId = chatId,
+                        toWhoId = ownerId,
+                        inMsg = mutableListOf(message)
+                    )
+                }
+            }
     }
 
+    //п.5
     fun createMsg(ownerId: Int, toWhoId: Int, text: String): Int {
         val message = Message(ownerId = ownerId, msgId = msgId++, toWhoId = toWhoId, text = text)
         checkCreateChat(ownerId, toWhoId, message)
         return 1
     }
 
-
+    // п.2
     fun getAllChats(ownerId: Int): List<Chat> {
-        return chats.filter { it.ownerId == ownerId }.sortedBy { it.chatId }
+        return chatsSeq.filter { it.ownerId == ownerId }
+            .sortedBy { it.chatId }
+            .toList()
     }
 
-//    fun getMsgOfChat(ownerId: Int, toWhoId: Int): String {
-//        val chat = chats.find { it.ownerId == ownerId && it.toWhoId == toWhoId }
-//        chat ?: throw ChatNotFoundException("Chat not found")
-//        val allMsg = chat.inMsg + chat.outMsg
-//        return allMsg.sortedBy { it.msgId }.joinToString("")
-//    }
-
-    // От эксперта :
+    // доп
     fun getMsgOfChatFunc(ownerId: Int, toWhoId: Int) =
-        chats.find { it.ownerId == ownerId && it.toWhoId == toWhoId }
+        chatsSeq.find { it.ownerId == ownerId && it.toWhoId == toWhoId }
             ?.let { it.inMsg + it.outMsg }
             ?.sortedBy { it.msgId }
-        //            ?.joinToString("\n")
+            ?.joinToString("\n")
             ?: throw ChatNotFoundException("Chat not found")
 
+    // п.8
     fun deleteChat(ownerId: Int, chatId: Int): Int {
-        val chat = chats.filter { it.ownerId == ownerId }.find { it.chatId == chatId }
-        chat ?: throw ChatNotFoundException("Chat not found")
-        chats.remove(chat)
+        chatsSeq.filter { it.ownerId == ownerId }
+            .find { it.chatId == chatId }
+            .let { chatsSeq -= it ?: throw ChatNotFoundException("Chat not found") }
         return 1
     }
 
-    fun deleteMsd(ownerId: Int, toWhoId: Int, msgId: Int): Int {
-        val chat = chats.find { it.ownerId == ownerId && it.toWhoId == toWhoId }
-        chat ?: throw MessageNotFoundException("Message not found")
-        val msg = chat.outMsg.find { it.msgId == msgId }
-        msg ?: throw MessageNotFoundException("Message not found")
-        chat.outMsg.remove(msg)
+    // п.6
+    fun deleteMsg(ownerId: Int, toWhoId: Int, msgId: Int): Int {
+        chatsSeq.find { it.ownerId == ownerId && it.toWhoId == toWhoId }
+            .let { chat ->
+                chat?.outMsg?.find { it.msgId == msgId }?.let { chat.outMsg.remove(it) }
+                    ?: throw MessageNotFoundException("Message not found")
+            }
         return 1
     }
 
+    //доп
     fun readMsg(ownerId: Int, toWhoId: Int, msgId: Int): Boolean {
         var mark = false
         // метка прочитанные в чате отправителя
-        val chatInd = chats.indices.find { chats[it].ownerId == ownerId && chats[it].toWhoId == toWhoId }
-        if (chatInd != null) {
-            val outMsgInd = chats[chatInd].outMsg.indices.find { chats[chatInd].outMsg[it].msgId == msgId }
-            if (outMsgInd != null) {
-                chats[chatInd].outMsg[outMsgInd].readMark = true
-                mark = true
-            } else println("No such message")
-        } else println("No such message")
+        chatsSeq.find { it.ownerId == ownerId && it.toWhoId == toWhoId }
+            .let { it ->
+                it?.outMsg?.find { it.msgId == msgId }?.let {
+                    it.readMark = true
+                    mark = true
+                }
+                    ?: println("No such message")
+            }
 
         // метка прочитанные в чате получателя
-        val chat2Ind = chats.indices.find { chats[it].ownerId == toWhoId && chats[it].toWhoId == ownerId }
-        if (chat2Ind != null) {
-            val inMsgInd = chats[chat2Ind].inMsg.indices.find { chats[chat2Ind].inMsg[it].msgId == msgId }
-            if (inMsgInd != null) {
-                chats[chat2Ind].inMsg[inMsgInd].readMark = true
-                mark = true
-            } else println("No such message")
-        } else println("No such message")
+        chatsSeq.find { it.ownerId == toWhoId && it.toWhoId == ownerId }
+            .let { it ->
+                it?.inMsg?.find { it.msgId == msgId }?.let {
+                    it.readMark = true
+                    mark = true
+                }
+                    ?: println("No such message")
+            }
 
         return mark
     }
 
-    fun getUnreadMsgOfChat(ownerId: Int, toWhoId: Int): String {
-        val chat = chats.find { it.ownerId == ownerId && it.toWhoId == toWhoId }
-        chat ?: throw ChatNotFoundException("Chat not found")
-        val unreadMsg = chat.inMsg.filter { !it.readMark }
-        return if (unreadMsg.isEmpty()) {
-            "Нет непрочитанных сообщений в чате с $toWhoId"
-        } else
-            "Непрочитанные сообщения в чате с $toWhoId: " + unreadMsg.sortedBy { it.msgId }.joinToString("")
-    }
+    // доп
+    fun getUnreadMsgOfChat(ownerId: Int, toWhoId: Int) =
+        chatsSeq.find { it.ownerId == ownerId && it.toWhoId == toWhoId }
+            .let { it -> it?.inMsg?.filter { !it.readMark } }
+            ?.sortedBy { it.msgId }
+            ?.joinToString("\n") { "unread msg with $toWhoId: $it" }
+            ?.ifEmpty { "No unread msg with $toWhoId" }
 
-    fun getUnreadMsgOfAllChats(ownerId: Int): String {
-        val chat = chats.filter { it.ownerId == ownerId }
-        val sb: StringBuilder = StringBuilder()
-        chat.forEach {
-            val owner = it.ownerId
-            val toWho = it.toWhoId
-            sb.append(getUnreadMsgOfChat(owner, toWho))
-            sb.append("\n")
-        }
-        return sb.toString()
-    }
+    //доп
+    fun getUnreadMsgOfAllChats(ownerId: Int) =
+        chatsSeq.filter { it.ownerId == ownerId }
+            .map { chat -> getUnreadMsgOfChat(chat.ownerId, chat.toWhoId) }
+            .joinToString("\n")
 
     private fun unreadChat(chat: Chat): Boolean {
-        val inMsg = chat.inMsg
-        val notRead = inMsg.filter { !it.readMark }
-        if (notRead.isEmpty()) {
-            return true
-        }
+        chatsSeq.find { it == chat }
+            ?.let { ch -> ch.inMsg.filter { !it.readMark } }
+            ?.ifEmpty { return true }
         return false
     }
 
-    fun getUnreadChats(ownerId: Int): String {
-        val chats = chats.filter { it.ownerId == ownerId }
-        return chats.filter { chat: Chat -> !unreadChat(chat) }.joinToString("\n")
-    }
+    // доп к п.1
+    fun getUnreadChats(ownerId: Int): String =
+        chatsSeq.filter { it.ownerId == ownerId }
+            .filter { chat: Chat -> !unreadChat(chat) }
+            .joinToString("\n")
 
-    fun getUnreadChatsCount(ownerId: Int): Int {
-        val chats = chats.filter { it.ownerId == ownerId }
-        val unreadChats = chats.filter { chat: Chat -> !unreadChat(chat) }
-        return unreadChats.size
-    }
+    // п.1
+    fun getUnreadChatsCount(ownerId: Int): Int =
+        chatsSeq.filter { it.ownerId == ownerId }
+            .filter { chat: Chat -> !unreadChat(chat) }
+            .count()
 
-    fun getSpecifiedInMsg(ownerId: Int, chatId: Int, msgId: Int, numberToShow: Int): String {
-        val chat = chats.indices.find { chats[it].ownerId == ownerId && chats[it].chatId == chatId }
-        chat ?: throw ChatNotFoundException("Chat not found")
-        val msg = (chats[chat].inMsg + chats[chat].outMsg).sortedBy { it.msgId }
-        val ind = msg.indices.find { msg[it].msgId == msgId }
-        ind ?: throw MessageNotFoundException("Message not found")
-        val lastIndex =
-            if ((ind + numberToShow) > (chats[chat].inMsg + chats[chat].outMsg).size) (chats[chat].inMsg + chats[chat].outMsg).size else (ind + numberToShow)
-        for (index in ind until lastIndex) {
-            if (chats[chat].inMsg.contains(msg[index])) {
-                //(chats[chat].inMsg + chats[chat].outMsg).sortedBy { it.msgId }[index].readMark = true
-                msg[index].readMark = true
+    // п.4
+    fun getSpecifiedInMsg(ownerId: Int, chatId: Int, msgId: Int, numberToShow: Int) =
+
+        chatsSeq.find { it.ownerId == ownerId && it.chatId == chatId }
+            ?.let { it.inMsg + it.outMsg }
+            ?.asSequence()
+            ?.sortedBy { it.msgId }
+            ?.filter { it.msgId >= msgId }
+            ?.take(numberToShow)
+            ?.onEach {
+                if (it.toWhoId == ownerId) {
+                    it.readMark = true
+                }
             }
-        }
-        val msgToShow =
-            //(chats[chat].inMsg + chats[chat].outMsg).sortedBy { it.msgId }.subList(fromIndex = ind, toIndex = lastIndex)
-            msg.subList(fromIndex = ind, toIndex = lastIndex)
-        return msgToShow.joinToString("\n")
-    }
+            ?.joinToString("\n")
 
-    fun getLastMsg(ownerId: Int): MutableList<String> {
-        val chats = chats.filter { it.ownerId == ownerId }
-        val msg = mutableListOf<String>()
-        chats.forEach {
-            msg += if ((it.inMsg + it.outMsg).isEmpty()) "Нет сообщений" else (it.inMsg + it.outMsg).last().toString()
-        }
-        return msg
-    }
+    // п.3
+    fun getLastMsgFunc(ownerId: Int) =
+        chatsSeq.filter { it.ownerId == ownerId }
+            .map { chat ->
+                chat.let { it.inMsg + it.outMsg }
+                    .maxByOrNull { it.msgId }
+                    ?.text ?: "Нет сообщений"
+            }
+            .joinToString("\n")
+
 }
 
 
 fun main() {
-    val chat1 = ChatService()
+    val chat1 = ChatServiceOptimised()
     println(chat1.createMsg(1, 4, "msg1.1"))  // msdId = 1 (будет прочитано)
     println(chat1.createMsg(1, 4, "msg1.2"))  // msdId = 2
     println(chat1.createMsg(1, 6, "msg1.3"))  // msdId = 3  (будет прочитано)
@@ -207,14 +193,14 @@ fun main() {
     println(chat1.createMsg(4, 6, "msg5.2"))  // msdId = 5
     println(chat1.createMsg(4, 1, "msg4.2"))
     println(chat1.createMsg(6, 7, "msg6.1"))
-    println(chat1.deleteMsd(6, 7, 7))
+    println(chat1.deleteMsg(6, 7, 7))
     println(chat1.getAllChats(1))
     println(chat1.getAllChats(4))
     println(chat1.getAllChats(6))
     println()
 
     println("Specified in-msg")
-    println(chat1.getSpecifiedInMsg(4, 1, 1, 3))
+    println(chat1.getSpecifiedInMsg(4, 1, 2, 2))
     println("All msg")
     println(chat1.getMsgOfChatFunc(4, 1))
 
@@ -222,6 +208,7 @@ fun main() {
     println("reading msg")
     println(chat1.readMsg(1, 4, 1))
     println(chat1.readMsg(1, 6, 3))
+    println(chat1.getAllChats(4))
 
     println()
     println("Unread msg:")
@@ -248,7 +235,7 @@ fun main() {
     println(chat1.getMsgOfChatFunc(4, 6))
     println()
     println("Deleting Msg")
-    println(chat1.deleteMsd(1, 4, 1))
+    println(chat1.deleteMsg(1, 4, 1))
     println(chat1.getAllChats(1))
     println()
     println("Deleting Chat")
@@ -257,7 +244,7 @@ fun main() {
     println(chat1.getAllChats(4))
     println()
     println("Get last msg")
-    println(chat1.getLastMsg(6))
+    println(chat1.getLastMsgFunc(6))
 
 
 }
